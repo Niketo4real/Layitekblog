@@ -1,0 +1,6 @@
+{
+  "name": "Layitek Blog",
+  "description": "Practical technology guides, gadget reviews, telecommunications updates, Nigerian CAC business registration insights, and corporate branding resources by Layitek Limited.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
