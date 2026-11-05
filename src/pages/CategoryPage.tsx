@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Search, ChevronRight } from 'lucide-react';
 import { useBlog } from '../context/BlogContext';
+import { fetchBlogArticles } from '../lib/supabase';
 import { ArticleCard, formatCategoryName } from '../components/ArticleCard';
 import { NewsletterBox } from '../components/NewsletterBox';
 import { SeoHead } from '../components/SeoHead';
@@ -24,17 +25,13 @@ export const CategoryPage: React.FC = () => {
     if (!categorySlug) return;
     let cancelled = false;
     setLoading(true);
-    const params = new URLSearchParams({
+
+    fetchBlogArticles({
       category: categorySlug,
       sort: sortBy,
-      limit: '100',
-    });
-    if (searchQuery.trim()) {
-      params.set('search', searchQuery.trim());
-    }
-
-    fetch(`/api/articles?${params.toString()}`)
-      .then((r) => r.json())
+      limit: 100,
+      search: searchQuery.trim() || undefined,
+    })
       .then((data) => {
         if (!cancelled && data.items) {
           setArticles(data.items);

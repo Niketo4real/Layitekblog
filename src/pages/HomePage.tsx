@@ -12,6 +12,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useBlog } from '../context/BlogContext';
+import { fetchBlogArticles } from '../lib/supabase';
 import { ArticleCard } from '../components/ArticleCard';
 import { NewsletterBox } from '../components/NewsletterBox';
 import { SeoHead } from '../components/SeoHead';
@@ -51,8 +52,11 @@ export const HomePage: React.FC = () => {
 
     let cancelled = false;
     setLoadingTab(true);
-    fetch(`/api/articles?category=${encodeURIComponent(selectedCategoryTab)}&limit=12&sort=latest`)
-      .then((r) => r.json())
+    fetchBlogArticles({
+      category: selectedCategoryTab,
+      limit: 12,
+      sort: 'latest',
+    })
       .then((data) => {
         if (!cancelled && data.items) {
           setFilteredLatest(data.items);

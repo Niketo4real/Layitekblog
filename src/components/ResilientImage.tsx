@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { FileText } from 'lucide-react';
+import { buildClientSvgDataUri } from '../lib/supabase';
 
 interface ResilientImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src: string;
@@ -18,7 +19,15 @@ export const ResilientImage: React.FC<ResilientImageProps> = ({
 }) => {
   const [hasError, setHasError] = useState(false);
 
-  if (hasError || !src) {
+  const resolvedSrc = useMemo(() => {
+    if (!src) return '';
+    if (src.startsWith('/api/media/illustration/')) {
+      return buildClientSvgDataUri(src, fallbackLabel || alt);
+    }
+    return src;
+  }, [src, fallbackLabel, alt]);
+
+  if (hasError || !resolvedSrc) {
     return (
       <div
         className={`flex flex-col items-center justify-center bg-gradient-to-br from-[#08204E] to-[#0B3C8C] text-white p-6 text-center ${aspectClassName} ${className}`}
@@ -36,7 +45,7 @@ export const ResilientImage: React.FC<ResilientImageProps> = ({
 
   return (
     <img
-      src={src}
+      src={resolvedSrc}
       alt={alt}
       referrerPolicy="no-referrer"
       onError={() => setHasError(true)}

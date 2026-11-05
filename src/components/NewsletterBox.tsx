@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, CheckCircle2, AlertCircle } from 'lucide-react';
+import { subscribeBlogNewsletter } from '../lib/supabase';
 
 export const NewsletterBox: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -17,15 +18,7 @@ export const NewsletterBox: React.FC = () => {
     setStatus('submitting');
     setMessage('');
     try {
-      const res = await fetch('/api/newsletter/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Subscription failed.');
-      }
+      const data = await subscribeBlogNewsletter(email.trim());
       setStatus('success');
       setMessage(
         data.message ||

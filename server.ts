@@ -33,6 +33,10 @@ import {
   generateLayitekFaviconSvg,
   generateArticleIllustrationSvg,
 } from './src/lib/svg-illustrations.ts';
+import {
+  authenticateAdminWithEmailPassword,
+  updateAdminPassword,
+} from './src/db/users.ts';
 import { requireAuth, AuthRequest } from './src/middleware/auth.ts';
 
 dotenv.config();
@@ -263,8 +267,42 @@ async function startServer() {
   });
 
   // ---------------------------------------------------------------------------
-  // 4. Protected Administrator API Routes (Requires Firebase Auth Token)
+  // 4. Protected Administrator API Routes
   // ---------------------------------------------------------------------------
+  app.post('/api/admin/auth/login', async (req, res) => {
+    try {
+      await ensureDatabaseSeeded();
+      const { email, password } = req.body || {};
+      const session = await authenticateAdminWithEmailPassword(
+        email || '',
+        password || ''
+      );
+      res.json(session);
+    } catch (error: any) {
+      res.status(401).json({
+        error: error.message || 'Invalid administrator email or password.',
+      });
+    }
+  });
+
+  app.post(
+    '/api/admin/auth/password',
+    requireAuth,
+    async (req: AuthRequest, res) => {
+      try {
+        const { newPassword } = req.body || {};
+        await updateAdminPassword(newPassword || '');
+        res.json({
+          message: 'Administrator password updated successfully.',
+        });
+      } catch (error: any) {
+        res.status(400).json({
+          error: error.message || 'Failed to update administrator password.',
+        });
+      }
+    }
+  );
+
   app.get('/api/admin/overview', requireAuth, async (req: AuthRequest, res) => {
     try {
       await ensureDatabaseSeeded();

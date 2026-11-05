@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { adminAuth } from '../lib/firebase-admin.ts';
-import { getOrCreateUser } from '../db/users.ts';
+import {
+  getOrCreateUser,
+  verifySignedAdminToken,
+} from '../db/users.ts';
 import { getSupabaseServerClient } from '../lib/supabase-sync.ts';
 
 export interface AuthRequest extends Request {
@@ -32,7 +35,24 @@ export const requireAuth = async (
 
   const token = authHeader.split('Bearer ')[1];
 
-  // 1. Try Firebase ID Token Verification
+  // 1. Try Signed Layitek Admin Session Token
+  const signedPayload = verifySignedAdminToken(token);
+  if (signedPayload) {
+    try {
+      req.user = signedPayload;
+      const dbUser = await getOrCreateUser(
+        signedPayload.uid,
+        signedPayload.email,
+        signedPayload.name
+      );
+      req.dbUser = dbUser;
+      return next();
+    } catch (err) {
+      console.error('Error synchronizing signed admin user:', err);
+    }
+  }
+
+  // 2. Try Firebase ID Token Verification
   try {
     const decodedToken = await adminAuth.verifyIdToken(token);
     req.user = {
@@ -53,7 +73,7 @@ export const requireAuth = async (
     // Proceed to check Supabase Auth token
   }
 
-  // 2. Try Supabase Auth JWT Verification
+  // 3. Try Supabase Auth JWT Verification
   try {
     const supabaseClient = getSupabaseServerClient();
     if (supabaseClient) {

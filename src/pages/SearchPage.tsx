@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { useBlog } from '../context/BlogContext';
+import { fetchBlogArticles } from '../lib/supabase';
 import { ArticleCard } from '../components/ArticleCard';
 import { SeoHead } from '../components/SeoHead';
 import { ArticleSummary } from '../types';
@@ -27,19 +28,15 @@ export const SearchPage: React.FC = () => {
     let cancelled = false;
     setLoading(true);
 
-    const params = new URLSearchParams({
+    fetchBlogArticles({
       sort: sortBy,
-      limit: '100',
-    });
-    if (query.trim()) {
-      params.set('search', query.trim());
-    }
-    if (selectedCategory && selectedCategory !== 'all') {
-      params.set('category', selectedCategory);
-    }
-
-    fetch(`/api/articles?${params.toString()}`)
-      .then((r) => r.json())
+      limit: 100,
+      search: query.trim() || undefined,
+      category:
+        selectedCategory && selectedCategory !== 'all'
+          ? selectedCategory
+          : undefined,
+    })
       .then((data) => {
         if (!cancelled && data.items) {
           setResults(data.items);

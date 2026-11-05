@@ -208,7 +208,7 @@ END;
 $$;
 
 -- =============================================================================
--- 9. ROW LEVEL SECURITY (RLS) POLICIES FOR SUPABASE
+-- 9. ROW LEVEL SECURITY (RLS) POLICIES FOR SUPABASE & VERCEL SYNC
 -- =============================================================================
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.articles ENABLE ROW LEVEL SECURITY;
@@ -221,17 +221,22 @@ CREATE POLICY "Allow public read of categories"
   ON public.categories FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Allow public read of published articles" ON public.articles;
-CREATE POLICY "Allow public read of published articles"
-  ON public.articles FOR SELECT USING (status = 'published');
+DROP POLICY IF EXISTS "Allow full access to articles" ON public.articles;
+CREATE POLICY "Allow full access to articles"
+  ON public.articles FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow public read of site settings" ON public.site_settings;
-CREATE POLICY "Allow public read of site settings"
-  ON public.site_settings FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow full access to site settings" ON public.site_settings;
+CREATE POLICY "Allow full access to site settings"
+  ON public.site_settings FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow public read of article images" ON public.article_images;
-CREATE POLICY "Allow public read of article images"
-  ON public.article_images FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow full access to article images" ON public.article_images;
+CREATE POLICY "Allow full access to article images"
+  ON public.article_images FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow public newsletter subscription insert" ON public.newsletter_subscribers;
-CREATE POLICY "Allow public newsletter subscription insert"
-  ON public.newsletter_subscribers FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow full access to newsletter subscribers" ON public.newsletter_subscribers;
+CREATE POLICY "Allow full access to newsletter subscribers"
+  ON public.newsletter_subscribers FOR ALL USING (true) WITH CHECK (true);
+

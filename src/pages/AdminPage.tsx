@@ -43,7 +43,7 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
 } from '../lib/firebase';
-import { supabase } from '../lib/supabase';
+import { supabase, executeAdminRequest } from '../lib/supabase';
 import {
   ArticleSummary,
   ArticleDetail,
@@ -156,6 +156,7 @@ export const AdminPage: React.FC = () => {
     currentUser,
     authLoading,
     getAuthToken,
+    setDirectAdminSession,
     signOutAdmin,
     categories,
     settings: publicSettings,
@@ -258,17 +259,7 @@ export const AdminPage: React.FC = () => {
       if (!token) {
         throw new Error('Authentication session expired. Please sign in again.');
       }
-      const headers = new Headers(options.headers || {});
-      headers.set('Authorization', `Bearer ${token}`);
-      if (!headers.has('Content-Type') && options.body) {
-        headers.set('Content-Type', 'application/json');
-      }
-      const res = await fetch(url, { ...options, headers });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || `Request failed (${res.status})`);
-      }
-      return data;
+      return executeAdminRequest(url, options, token);
     },
     [getAuthToken]
   );
@@ -330,7 +321,42 @@ export const AdminPage: React.FC = () => {
     }
     setSigningIn(true);
     try {
-      // 1. Try Supabase Email/Password Sign-In
+      // 1. Primary Server-Side Admin Authentication
+      try {
+        const res = await fetch('/api/admin/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password: loginPassword }),
+        });
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data.token && data.user) {
+            setDirectAdminSession(data.token, {
+              uid: data.user.uid,
+              email: data.user.email,
+            });
+            return;
+          }
+        }
+      } catch {
+        // Server route unavailable (e.g. static Vercel deployment)
+      }
+
+      // 2. Direct Default Admin Fallback for Static Vercel Deployments
+      if (
+        (email.toLowerCase() === 'admin@layitek.com' ||
+          email.toLowerCase() === 'info@layitek.com') &&
+        loginPassword === 'Layitek2026!'
+      ) {
+        setDirectAdminSession('layitek-supabase-admin-session', {
+          uid: 'layitek-admin-1',
+          email: email.toLowerCase(),
+        });
+        return;
+      }
+
+      // 3. Fallback: Supabase Email/Password Sign-In
       const { data: sbSignIn, error: sbError } =
         await supabase.auth.signInWithPassword({
           email,
@@ -340,31 +366,11 @@ export const AdminPage: React.FC = () => {
         return;
       }
 
-      // 2. Try Firebase Email/Password Sign-In
-      try {
-        await signInWithEmailAndPassword(auth, email, loginPassword);
-        return;
-      } catch {
-        // Proceed to check if first-time admin registration
-      }
-
-      // 3. Try creating the administrator account in Supabase or Firebase if first time
-      const { data: sbSignUp, error: sbSignUpErr } =
-        await supabase.auth.signUp({
-          email,
-          password: loginPassword,
-          options: {
-            data: { full_name: 'Layitek Administrator' },
-          },
-        });
-      if (!sbSignUpErr && sbSignUp?.session) {
-        return;
-      }
-
-      await createUserWithEmailAndPassword(auth, email, loginPassword);
+      // 4. Fallback: Firebase Email/Password Sign-In
+      await signInWithEmailAndPassword(auth, email, loginPassword);
     } catch (err: any) {
       setAuthError(
-        'Invalid email or password (passwords must be at least 6 characters), or sign in directly with your Google Account above.'
+        'Invalid administrator email or password. Please verify your credentials or sign in with Google above.'
       );
     } finally {
       setSigningIn(false);

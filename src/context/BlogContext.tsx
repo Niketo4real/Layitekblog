@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, firebaseSignOut } from '../lib/firebase';
-import { supabase } from '../lib/supabase';
+import { supabase, fetchBlogBootstrap } from '../lib/supabase';
 import { ArticleSummary, CategoryItem, SiteSettingsMap } from '../types';
 
 export interface AdminIdentity {
@@ -19,14 +19,16 @@ interface BlogContextValue {
   loading: boolean;
   error: string | null;
   refreshPublicData: () => Promise<void>;
-  // Auth state (token kept strictly in memory per security guidelines)
   currentUser: AdminIdentity | null;
   authLoading: boolean;
   getAuthToken: () => Promise<string | null>;
+  setDirectAdminSession: (token: string, user: AdminIdentity) => void;
   signOutAdmin: () => Promise<void>;
 }
 
 const BlogContext = createContext<BlogContextValue | undefined>(undefined);
+
+const ADMIN_SESSION_STORAGE_KEY = 'layitek_admin_session_v1';
 
 const FALLBACK_SETTINGS: SiteSettingsMap = {
   branding: {
@@ -94,6 +96,20 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [directSession, setDirectSession] = useState<{
+    token: string;
+    user: AdminIdentity;
+  } | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
+      if (raw) {
+        return JSON.parse(raw);
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return null;
+  });
   const [firebaseUser, setFirebaseUser] = useState<AdminIdentity | null>(null);
   const [supabaseUser, setSupabaseUser] = useState<AdminIdentity | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
@@ -101,23 +117,26 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshPublicData = useCallback(async () => {
     try {
       setError(null);
-      const res = await fetch('/api/bootstrap');
-      if (!res.ok) {
-        throw new Error('Failed to load blog data from server');
-      }
-      const data = await res.json();
-      if (data.settings) {
-        setSettings(data.settings);
-        if (data.settings.branding?.primaryColor) {
+      const data = await fetchBlogBootstrap();
+      if (data.settings && Object.keys(data.settings).length > 0) {
+        const mergedSettings: SiteSettingsMap = {
+          branding: { ...FALLBACK_SETTINGS.branding, ...(data.settings.branding || {}) },
+          homepage: { ...FALLBACK_SETTINGS.homepage, ...(data.settings.homepage || {}) },
+          contact: { ...FALLBACK_SETTINGS.contact, ...(data.settings.contact || {}) },
+          footer: { ...FALLBACK_SETTINGS.footer, ...(data.settings.footer || {}) },
+          seo: { ...FALLBACK_SETTINGS.seo, ...(data.settings.seo || {}) },
+        };
+        setSettings(mergedSettings);
+        if (mergedSettings.branding?.primaryColor) {
           document.documentElement.style.setProperty(
             '--brand-primary',
-            data.settings.branding.primaryColor
+            mergedSettings.branding.primaryColor
           );
         }
-        if (data.settings.branding?.faviconUrl) {
+        if (mergedSettings.branding?.faviconUrl) {
           const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement | null;
           if (link) {
-            link.href = data.settings.branding.faviconUrl;
+            link.href = mergedSettings.branding.faviconUrl;
           }
         }
       }
@@ -174,9 +193,25 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const currentUser = firebaseUser || supabaseUser;
+  const setDirectAdminSession = useCallback(
+    (token: string, user: AdminIdentity) => {
+      const next = { token, user };
+      setDirectSession(next);
+      try {
+        sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore storage errors
+      }
+    },
+    []
+  );
+
+  const currentUser = directSession?.user || firebaseUser || supabaseUser;
 
   const getAuthToken = useCallback(async (): Promise<string | null> => {
+    if (directSession?.token) {
+      return directSession.token;
+    }
     if (auth.currentUser) {
       try {
         return await auth.currentUser.getIdToken();
@@ -193,9 +228,15 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Failed to retrieve Supabase session token:', err);
     }
     return null;
-  }, []);
+  }, [directSession]);
 
   const signOutAdmin = useCallback(async () => {
+    setDirectSession(null);
+    try {
+      sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
     await Promise.allSettled([firebaseSignOut(auth), supabase.auth.signOut()]);
     setFirebaseUser(null);
     setSupabaseUser(null);
@@ -216,6 +257,7 @@ export const BlogProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         authLoading,
         getAuthToken,
+        setDirectAdminSession,
         signOutAdmin,
       }}
     >

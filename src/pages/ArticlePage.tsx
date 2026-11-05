@@ -10,6 +10,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { useBlog } from '../context/BlogContext';
+import { fetchBlogArticleBySlug } from '../lib/supabase';
 import {
   ArticleCard,
   formatCategoryName,
@@ -61,16 +62,14 @@ export const ArticlePage: React.FC = () => {
     setLoading(true);
     setNotFound(false);
 
-    fetch(`/api/articles/by-slug/${encodeURIComponent(articleSlug)}`)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error('Not found');
-        }
-        return res.json();
-      })
-      .then((data: ArticleDetail) => {
+    fetchBlogArticleBySlug(articleSlug)
+      .then((data) => {
         if (!cancelled) {
-          setArticle(data);
+          if (data) {
+            setArticle(data);
+          } else {
+            setNotFound(true);
+          }
         }
       })
       .catch(() => {
